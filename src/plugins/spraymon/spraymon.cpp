@@ -110,19 +110,19 @@
 #include "private.h"
 #include "plugins/output_format.h"
 
-#define PRINT_SPRAYMON(...) \
-    do { \
-        if(verbose) { \
-            eprint_current_time(); \
-            fprintf (stderr, __VA_ARGS__); \
-        }\
-    } while (0)
-
 // #define PRINT_SPRAYMON(...) \
 //     do { \
-//         eprint_current_time(); \
-//         fprintf (stderr, __VA_ARGS__); \
+//         if(verbose) { \
+//             eprint_current_time(); \
+//             fprintf (stderr, __VA_ARGS__); \
+//         }\
 //     } while (0)
+
+#define PRINT_SPRAYMON(...) \
+    do { \
+        eprint_current_time(); \
+        fprintf (stderr, __VA_ARGS__); \
+    } while (0)
 
 
 bool spraymon::read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value)
@@ -301,6 +301,7 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
         PRINT_SPRAYMON("[SPRAYMON] Failed to win32k members offsets.\n");
         throw -1;
     }
+    json_object_put(win32k_profile);
     
     // Collect kernel struct member offsets
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_EPROCESS", "Win32Process", &this->Eprocess_Win32Process))
@@ -317,7 +318,7 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
 
 spraymon::~spraymon()
 {
-    destroy_all_traps();
+
 }
 
 bool spraymon::stop()
