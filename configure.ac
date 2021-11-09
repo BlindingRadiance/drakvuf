@@ -492,6 +492,16 @@ if test x$disable_atoms = xyes; then
   AC_DEFINE_UNQUOTED(DISABLE_ATOMS, 1, "")
 fi
 
+AC_ARG_ENABLE([plugin_spraymon],
+  [AS_HELP_STRING([--disable-plugin-spraymon],
+    [Enable the spraymon plugin @<:@yes@:>@])],
+  [plugin_spraymon="$enableval"],
+  [plugin_spraymon="yes"])   
+AM_CONDITIONAL([PLUGIN_SPRAYMON], [test x$plugin_spraymon = xyes])
+if test x$plugin_spraymon = xyes; then
+  AC_DEFINE_UNQUOTED(ENABLE_PLUGIN_SPRAYMON, 1, "")
+fi
+
 #####################################################
 
 AC_ARG_ENABLE([repl],
@@ -550,6 +560,8 @@ AC_ARG_ENABLE([xtf],
   [xtf="$enableval"],
   [xtf="no"])
 AM_CONDITIONAL([XTF], [test x$xtf = xyes])
+
+
 
 #####################################################
 # AUTOHARDEN START
@@ -791,6 +803,7 @@ LibHookTest:  $plugin_libhooktest
 IPT:          $plugin_ipt
 HidSim:       $plugin_hidsim
 Rootkitmon:   $plugin_rootkitmon
+Spraymon:     $plugin_spraymon
 -------------------------------------------------------------------------------
 Deprecated Plugins
 WMIMon:       $plugin_wmimon
