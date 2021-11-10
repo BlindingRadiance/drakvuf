@@ -131,8 +131,7 @@ public:
     uint16_t gdi_threshold;
     uint16_t usr_threshold;
  
-    //bool done_final_analysis;
-
+ 
     spraymon(drakvuf_t drakvuf, const spraymon_config* config, output_format_t output);
     ~spraymon();
     bool stop();
@@ -143,7 +142,7 @@ public:
     bool read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value);
     
     event_response_t terminate_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-    //event_response_t final_analysis_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
+
 };
 
 #endif // SPRAYMON_H

@@ -196,62 +196,6 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void * ctx)
     eprocess_list->push_back(process);
 }
 
-// event_response_t spraymon::final_analysis_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-// {
-//     auto process_list = new std::vector<addr_t>;
-
-//     vmi_pid_t pid;
-//     uint16_t gdi_max_count;
-//     uint16_t usr_max_count;
-
-//     if (this->is_stopping() && !this->done_final_analysis)
-//     {
-//         PRINT_SPRAYMON("[SPRAYMON] Starting final analysis\n");
-//         drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(process_list));
-//         for (const auto& process : *process_list)
-//         {
-//             gdi_max_count = 0;
-//             usr_max_count = 0;
-//             auto temp_attach_data = info->attached_proc_data;
-//             auto temp_data = info->proc_data;
-
-//             proc_data_t data = {};
-//             if (!drakvuf_get_process_data(drakvuf, process, &data))
-//             {
-//                 PRINT_SPRAYMON("[SPRAYMON] Failed to get process data.\n");
-//                 continue;
-//             }
-//             if (!drakvuf_get_process_pid(drakvuf, process, &pid))
-//             {
-//                 PRINT_SPRAYMON("[SPRAYMON] Failed to get process pid.\n");
-//                 continue;
-//             }
-   
-//             info->attached_proc_data = data;
-//             info->proc_data = data;
-
-//             if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
-//             {
-//                 PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", data.name);
-//                 continue;
-//             }
-//             compare(drakvuf, gdi_max_count, usr_max_count);
-
-//             PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
-//                         data.name, gdi_max_count, usr_max_count);
-
-//             g_free(const_cast<char*>(data.name));
-
-//             info->attached_proc_data = temp_attach_data;
-//             info->proc_data = temp_data;
-//         }
-//         delete process_list;
-//         this->done_final_analysis = true;     
-//     }  
-//     return VMI_EVENT_RESPONSE_NONE;
-// }
-
-
 event_response_t spraymon::terminate_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 { 
     addr_t process = info->attached_proc_data.base_addr;
