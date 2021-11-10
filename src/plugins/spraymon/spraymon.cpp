@@ -175,17 +175,17 @@ bool spraymon::check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, 
     return true;
 }
 
-void spraymon::compare(drakvuf_t drakvuf, drakvuf_trap_info_t* info, uint16_t gdi_max_count,  uint16_t usr_max_count)
+void spraymon::compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count)
 {
     if (gdi_max_count > this->gdi_threshold)
     {
-        fmt::print(this->format, "spraymon", drakvuf, info,
+        fmt::print(this->format, "spraymon", drakvuf, nullptr,
                     keyval("Reason", fmt::Qstr("High GDI objects count detected!")));
     }
 
     if (usr_max_count > this->usr_threshold)
     {
-        fmt::print(this->format, "spraymon", drakvuf, info,
+        fmt::print(this->format, "spraymon", drakvuf, nullptr,
                     keyval("Reason", fmt::Qstr("High USER objects count detected!")));
     }
 }
@@ -196,60 +196,60 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void * ctx)
     eprocess_list->push_back(process);
 }
 
-event_response_t spraymon::final_analysis_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{
-    auto process_list = new std::vector<addr_t>;
+// event_response_t spraymon::final_analysis_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+// {
+//     auto process_list = new std::vector<addr_t>;
 
-    vmi_pid_t pid;
-    uint16_t gdi_max_count;
-    uint16_t usr_max_count;
+//     vmi_pid_t pid;
+//     uint16_t gdi_max_count;
+//     uint16_t usr_max_count;
 
-    if (this->is_stopping() && !this->done_final_analysis)
-    {
-        PRINT_SPRAYMON("[SPRAYMON] Starting final analysis\n");
-        drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(process_list));
-        for (const auto& process : *process_list)
-        {
-            gdi_max_count = 0;
-            usr_max_count = 0;
-            auto temp_attach_data = info->attached_proc_data;
-            auto temp_data = info->proc_data;
+//     if (this->is_stopping() && !this->done_final_analysis)
+//     {
+//         PRINT_SPRAYMON("[SPRAYMON] Starting final analysis\n");
+//         drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(process_list));
+//         for (const auto& process : *process_list)
+//         {
+//             gdi_max_count = 0;
+//             usr_max_count = 0;
+//             auto temp_attach_data = info->attached_proc_data;
+//             auto temp_data = info->proc_data;
 
-            proc_data_t data = {};
-            if (!drakvuf_get_process_data(drakvuf, process, &data))
-            {
-                PRINT_SPRAYMON("[SPRAYMON] Failed to get process data.\n");
-                continue;
-            }
-            if (!drakvuf_get_process_pid(drakvuf, process, &pid))
-            {
-                PRINT_SPRAYMON("[SPRAYMON] Failed to get process pid.\n");
-                continue;
-            }
+//             proc_data_t data = {};
+//             if (!drakvuf_get_process_data(drakvuf, process, &data))
+//             {
+//                 PRINT_SPRAYMON("[SPRAYMON] Failed to get process data.\n");
+//                 continue;
+//             }
+//             if (!drakvuf_get_process_pid(drakvuf, process, &pid))
+//             {
+//                 PRINT_SPRAYMON("[SPRAYMON] Failed to get process pid.\n");
+//                 continue;
+//             }
    
-            info->attached_proc_data = data;
-            info->proc_data = data;
+//             info->attached_proc_data = data;
+//             info->proc_data = data;
 
-            if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
-            {
-                PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", data.name);
-                continue;
-            }
-            compare(drakvuf, info, gdi_max_count, usr_max_count);
+//             if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
+//             {
+//                 PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", data.name);
+//                 continue;
+//             }
+//             compare(drakvuf, gdi_max_count, usr_max_count);
 
-            PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
-                        data.name, gdi_max_count, usr_max_count);
+//             PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
+//                         data.name, gdi_max_count, usr_max_count);
 
-            g_free(const_cast<char*>(data.name));
+//             g_free(const_cast<char*>(data.name));
 
-            info->attached_proc_data = temp_attach_data;
-            info->proc_data = temp_data;
-        }
-        delete process_list;
-        this->done_final_analysis = true;     
-    }  
-    return VMI_EVENT_RESPONSE_NONE;
-}
+//             info->attached_proc_data = temp_attach_data;
+//             info->proc_data = temp_data;
+//         }
+//         delete process_list;
+//         this->done_final_analysis = true;     
+//     }  
+//     return VMI_EVENT_RESPONSE_NONE;
+// }
 
 
 event_response_t spraymon::terminate_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
@@ -266,10 +266,10 @@ event_response_t spraymon::terminate_user_process_hook_cb(drakvuf_t drakvuf, dra
         PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", proc_name);
         return VMI_EVENT_RESPONSE_NONE;
     }
-    compare(drakvuf, info, gdi_max_count, usr_max_count);
+    compare(drakvuf, gdi_max_count, usr_max_count);
 
 
-    PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
+    PRINT_SPRAYMON("[SPRAYMON] (Terminate) Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
                     proc_name, gdi_max_count, usr_max_count);
     if (proc_name) g_free(proc_name);
     
@@ -277,7 +277,7 @@ event_response_t spraymon::terminate_user_process_hook_cb(drakvuf_t drakvuf, dra
 }
 
 spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_format_t output)
-    : pluginex(drakvuf, output), format(output), done_final_analysis(false)
+    : pluginex(drakvuf, output), format(output)
 {
     this->gdi_threshold = config->gdi_threshold;
     this->usr_threshold = config->usr_threshold;
@@ -323,16 +323,52 @@ spraymon::~spraymon()
 
 bool spraymon::stop()
 {
-    if (!is_stopping() && !done_final_analysis)
+    auto process_list = new std::vector<addr_t>;
+
+    vmi_pid_t pid;
+    uint16_t gdi_max_count;
+    uint16_t usr_max_count;
+    drakvuf_trap_info_t info;
+
+    if (!this->is_stopping())
     {
-        m_is_stopping = true;
-        syscall = createSyscallHook("NtClose", &spraymon::final_analysis_cb);
-        // Return status `Pending`
-        return false;
-    }
-    if (!done_final_analysis)
-    {
-        return false;
-    }
+        this->m_is_stopping = true;
+        PRINT_SPRAYMON("[SPRAYMON] Starting final analysis\n");
+        drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(process_list));
+        for (const auto& process : *process_list)
+        {
+            gdi_max_count = 0;
+            usr_max_count = 0;
+
+            proc_data_t data = {};
+            if (!drakvuf_get_process_data(drakvuf, process, &data))
+            {
+                PRINT_SPRAYMON("[SPRAYMON] Failed to get process data.\n");
+                continue;
+            }
+            if (!drakvuf_get_process_pid(drakvuf, process, &pid))
+            {
+                PRINT_SPRAYMON("[SPRAYMON] Failed to get process pid.\n");
+                continue;
+            }
+   
+            info.attached_proc_data = data;
+            info.proc_data = data;
+
+            if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
+            {
+                PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", data.name);
+                continue;
+            }
+            compare(drakvuf, gdi_max_count, usr_max_count);
+
+            PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
+                        data.name, gdi_max_count, usr_max_count);
+
+            g_free(const_cast<char*>(data.name));
+
+        }
+        delete process_list;
+    }  
     return true;
 }
