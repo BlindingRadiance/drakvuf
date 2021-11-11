@@ -123,24 +123,24 @@ public:
     const output_format_t format;
     std::unique_ptr<libhook::SyscallHook> syscall;
 
-    
+
     addr_t Eprocess_Win32Process;
     //_W32PROCESS offsets
     size_t GDIHandleCountPeak;
     size_t UserHandleCountPeak;
 
-    //assigned from config 
+    //assigned from config
     uint16_t gdi_threshold;
     uint16_t usr_threshold;
- 
+
 
     spraymon(drakvuf_t drakvuf, const spraymon_config* config, output_format_t output);
     ~spraymon();
     bool stop();
 
-    bool check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t * gdi_max_count,  uint16_t*  usr_max_count);
-    void compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count, char * process_name, vmi_pid_t pid);
-    bool read_kernel_addr(drakvuf_t drakvuf, addr_t in_address, vmi_pid_t pid, addr_t * out_address);
+    bool check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t* gdi_max_count,  uint16_t*  usr_max_count);
+    void compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count, char* process_name, vmi_pid_t pid);
+    bool read_kernel_addr(drakvuf_t drakvuf, addr_t in_address, vmi_pid_t pid, addr_t* out_address);
     bool read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value);
 
     event_response_t hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
