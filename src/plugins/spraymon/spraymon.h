@@ -123,9 +123,9 @@ public:
     const output_format_t format;
     std::unique_ptr<libhook::SyscallHook> syscall;
 
-    //_W32PROCESS offsets
+    
     addr_t Eprocess_Win32Process;
-    addr_t Eprocess_Win32WindowStation;
+    //_W32PROCESS offsets
     size_t GDIHandleCountPeak;
     size_t UserHandleCountPeak;
 
