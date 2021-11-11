@@ -222,11 +222,8 @@ event_response_t spraymon::hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_tr
 }
 
 spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_format_t output)
-    : pluginex(drakvuf, output), format(output)
+    : pluginex(drakvuf, output), format(output), gdi_threshold(config->gdi_threshold), usr_threshold(config->usr_threshold)
 {
-    this->gdi_threshold = config->gdi_threshold;
-    this->usr_threshold = config->usr_threshold;
-
     if (!config->win32k_profile)
     {
         PRINT_DEBUG("[SPRAYMON] Win32k json profile required to run the plugin.\n");
@@ -241,8 +238,8 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
 
     // Collect win32k offsets
     if (!json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "GDIHandleCountPeak", &this->GDIHandleCountPeak) || 
-       !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->UserHandleCountPeak)       
-      )
+        !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->UserHandleCountPeak)       
+       )
     {
         PRINT_DEBUG("[SPRAYMON] Failed to win32k members offsets.\n");
         throw -1;
@@ -255,11 +252,8 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
         PRINT_DEBUG("[SPRAYMON] Failed to get kernel struct member offsets.\n");
         throw -1;
     }
-
     syscall = createSyscallHook("PsSetProcessWin32Process", &spraymon::hook_setwin32process_cb);
-    
     PRINT_DEBUG("[SPRAYMON]  PLUGIN STARTED\n");
-   
 }
 
 spraymon::~spraymon()
