@@ -107,7 +107,6 @@
 #include <json-c/json_object.h>
 
 #include "spraymon.h"
-#include "private.h"
 #include "plugins/output_format.h"
 
 // #define PRINT_SPRAYMON(...) \
@@ -141,7 +140,7 @@ bool spraymon::check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, 
 {
     addr_t win32process;
 
-    if (!read_kernel_addr(drakvuf, process + this->Eprocess_Win32Process, pid, &win32process))
+    if (!read_kernel_addr(drakvuf, process + this->eprocess_win32process, pid, &win32process))
     {
         PRINT_DEBUG("[SPRAYMON] Failed to read EPROCESS->Win32Process\n");
         return false;
@@ -152,13 +151,13 @@ bool spraymon::check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, 
         PRINT_DEBUG("[SPRAYMON] Win32Process is NULL\n");
         return false;
     }
-    if (!read_counter(drakvuf, win32process + this->GDIHandleCountPeak, pid, gdi_max_count))
+    if (!read_counter(drakvuf, win32process + this->gdihandlecountpeak, pid, gdi_max_count))
     {
         PRINT_DEBUG("[SPRAYMON] Failed to read GDI peak handle count\n");
         return false;
     }
 
-    if (!read_counter(drakvuf, win32process + this->UserHandleCountPeak, pid, usr_max_count))
+    if (!read_counter(drakvuf, win32process + this->userhandlecountpeak, pid, usr_max_count))
     {
         PRINT_DEBUG("[SPRAYMON] Failed to read USER peak handle count\n");
         return false;
@@ -185,7 +184,6 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void* ctx)
 
 event_response_t spraymon::hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
 {
-
     addr_t process = drakvuf_get_function_argument(drakvuf, info, 1);
     addr_t w32new = drakvuf_get_function_argument(drakvuf, info, 2);
 
@@ -230,6 +228,7 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
         throw -1;
     }
     json_object* win32k_profile = json_object_from_file(config->win32k_profile);
+
     if (!win32k_profile)
     {
         PRINT_DEBUG("[SPRAYMON] Failed to load JSON debug info for win32k.sys.\n");
@@ -237,8 +236,8 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
     }
 
     // Collect win32k offsets
-    if (!json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "GDIHandleCountPeak", &this->GDIHandleCountPeak) ||
-        !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->UserHandleCountPeak)
+    if (!json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "GDIHandleCountPeak", &this->gdihandlecountpeak) ||
+        !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->userhandlecountpeak)
     )
     {
         PRINT_DEBUG("[SPRAYMON] Failed to win32k members offsets.\n");
@@ -247,7 +246,7 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
     json_object_put(win32k_profile);
 
     // Collect kernel struct member offsets
-    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_EPROCESS", "Win32Process", &this->Eprocess_Win32Process))
+    if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_EPROCESS", "Win32Process", &this->eprocess_win32process))
     {
         PRINT_DEBUG("[SPRAYMON] Failed to get kernel struct member offsets.\n");
         throw -1;
@@ -285,6 +284,7 @@ bool spraymon::stop()
                 if (data->name) g_free(const_cast<char*>(data->name));
                 continue;
             }
+
             if (!drakvuf_get_process_pid(drakvuf, process, &pid))
             {
                 PRINT_DEBUG("[SPRAYMON] Failed to get process pid.\n");
