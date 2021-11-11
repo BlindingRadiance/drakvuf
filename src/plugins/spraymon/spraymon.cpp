@@ -112,17 +112,9 @@
 
 // #define PRINT_SPRAYMON(...) \
 //     do { \
-//         if(verbose) { \
-//             eprint_current_time(); \
-//             fprintf (stderr, __VA_ARGS__); \
-//         }\
+//         eprint_current_time(); \
+//         fprintf (stderr, __VA_ARGS__); \
 //     } while (0)
-
-#define PRINT_SPRAYMON(...) \
-    do { \
-        eprint_current_time(); \
-        fprintf (stderr, __VA_ARGS__); \
-    } while (0)
 
 
 bool spraymon::read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value)
@@ -151,42 +143,37 @@ bool spraymon::check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, 
 
     if (!read_kernel_addr(drakvuf, process + this->Eprocess_Win32Process, pid, &win32process))
     {
-        PRINT_SPRAYMON("[SPRAYMON] Failed to read EPROCESS->Win32Process\n");
+        PRINT_DEBUG("[SPRAYMON] Failed to read EPROCESS->Win32Process\n");
         return false;
     }
      
     if (!win32process)
     {
-        PRINT_SPRAYMON("[SPRAYMON] Win32Process is NULL\n");
+        PRINT_DEBUG("[SPRAYMON] Win32Process is NULL\n");
         return false;
     }
     if (!read_counter(drakvuf, win32process + this->GDIHandleCountPeak, pid, gdi_max_count))
     {
-         PRINT_SPRAYMON("[SPRAYMON] Failed to read GDI peak handle count\n");
+         PRINT_DEBUG("[SPRAYMON] Failed to read GDI peak handle count\n");
          return false;
     }
     
     if (!read_counter(drakvuf, win32process + this->UserHandleCountPeak, pid, usr_max_count))
     {
-         PRINT_SPRAYMON("[SPRAYMON] Failed to read USER peak handle count\n");
+         PRINT_DEBUG("[SPRAYMON] Failed to read USER peak handle count\n");
          return false;
     }
-
     return true;
 }
 
-void spraymon::compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count)
+void spraymon::compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count, char * process_name, vmi_pid_t pid)
 {
-    if (gdi_max_count > this->gdi_threshold)
+    if (gdi_max_count > this->gdi_threshold || usr_max_count > this->usr_threshold)
     {
         fmt::print(this->format, "spraymon", drakvuf, nullptr,
-                    keyval("Reason", fmt::Qstr("High GDI objects count detected!")));
-    }
-
-    if (usr_max_count > this->usr_threshold)
-    {
-        fmt::print(this->format, "spraymon", drakvuf, nullptr,
-                    keyval("Reason", fmt::Qstr("High USER objects count detected!")));
+            keyval("PID", fmt::Nval(pid)),
+            keyval("ProcessName", fmt::Qstr(process_name)),
+            keyval("Reason", fmt::Qstr("High graphic objects count detected!")));
     }
 }
 
@@ -196,27 +183,41 @@ static void process_visitor(drakvuf_t drakvuf, addr_t process, void * ctx)
     eprocess_list->push_back(process);
 }
 
-event_response_t spraymon::terminate_user_process_hook_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
-{ 
-    addr_t process = info->attached_proc_data.base_addr;
-    auto pid =  info->proc_data.pid;
+event_response_t spraymon::hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info)
+{
+
+    addr_t process = drakvuf_get_function_argument(drakvuf, info, 1);
+    addr_t w32new = drakvuf_get_function_argument(drakvuf, info, 2);
+
+    if (w32new != 0)
+    {
+        return VMI_EVENT_RESPONSE_NONE;
+    }
+
+    vmi_pid_t pid;
     uint16_t gdi_max_count;
     uint16_t usr_max_count;
 
-    char * proc_name;
-    proc_name = drakvuf_get_process_name(drakvuf, process, false);
-    if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
-    {  
-        PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", proc_name);
+    auto process_name = drakvuf_get_process_name(drakvuf, process, true);
+
+    if (!drakvuf_get_process_pid(drakvuf, process, &pid))
+    {
+        PRINT_DEBUG("[SPRAYMON] Failed to get process PID");
         return VMI_EVENT_RESPONSE_NONE;
     }
-    compare(drakvuf, gdi_max_count, usr_max_count);
 
-
-    PRINT_SPRAYMON("[SPRAYMON] (Terminate) Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
-                    proc_name, gdi_max_count, usr_max_count);
-    if (proc_name) g_free(proc_name);
+    if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
+    {  
+        PRINT_DEBUG("[SPRAYMON] (fail) Process name -> %s\n", process_name);
+        return VMI_EVENT_RESPONSE_NONE;
+    }
     
+    compare(drakvuf, gdi_max_count, usr_max_count, process_name, pid);
+
+    PRINT_DEBUG("[SPRAYMON] (success) Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
+                    process_name, gdi_max_count, usr_max_count);
+
+    if (process_name) g_free(const_cast<char*>(process_name));
     return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -225,15 +226,16 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
 {
     this->gdi_threshold = config->gdi_threshold;
     this->usr_threshold = config->usr_threshold;
+
     if (!config->win32k_profile)
     {
-        PRINT_SPRAYMON("[SPRAYMON] Win32k json profile required to run the plugin.\n");
+        PRINT_DEBUG("[SPRAYMON] Win32k json profile required to run the plugin.\n");
         throw -1;
     }
     json_object * win32k_profile = json_object_from_file(config->win32k_profile);
     if (!win32k_profile)
     {
-        PRINT_SPRAYMON("[SPRAYMON] Failed to load JSON debug info for win32k.sys.\n");
+        PRINT_DEBUG("[SPRAYMON] Failed to load JSON debug info for win32k.sys.\n");
         throw -1;
     }
 
@@ -242,7 +244,7 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
        !json_get_struct_member_rva(drakvuf, win32k_profile, "_W32PROCESS", "UserHandleCountPeak", &this->UserHandleCountPeak)       
       )
     {
-        PRINT_SPRAYMON("[SPRAYMON] Failed to win32k members offsets.\n");
+        PRINT_DEBUG("[SPRAYMON] Failed to win32k members offsets.\n");
         throw -1;
     }
     json_object_put(win32k_profile);
@@ -250,13 +252,13 @@ spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_for
     // Collect kernel struct member offsets
     if (!drakvuf_get_kernel_struct_member_rva(drakvuf, "_EPROCESS", "Win32Process", &this->Eprocess_Win32Process))
     {
-        PRINT_SPRAYMON("[SPRAYMON] Failed to get kernel struct member offsets.\n");
+        PRINT_DEBUG("[SPRAYMON] Failed to get kernel struct member offsets.\n");
         throw -1;
     }
 
-    syscall = createSyscallHook("NtTerminateProcess", &spraymon::terminate_user_process_hook_cb);
+    syscall = createSyscallHook("PsSetProcessWin32Process", &spraymon::hook_setwin32process_cb);
     
-    PRINT_SPRAYMON("[SPRAYMON]  PLUGIN STARTED\n");
+    PRINT_DEBUG("[SPRAYMON]  PLUGIN STARTED\n");
    
 }
 
@@ -267,51 +269,50 @@ spraymon::~spraymon()
 
 bool spraymon::stop()
 {
-    auto process_list = new std::vector<addr_t>;
-
-    vmi_pid_t pid;
-    uint16_t gdi_max_count;
-    uint16_t usr_max_count;
-    drakvuf_trap_info_t info;
-
     if (!this->is_stopping())
     {
+        auto process_list = new std::vector<addr_t>;
+        vmi_pid_t pid;
+        uint16_t gdi_max_count;
+        uint16_t usr_max_count;
+        proc_data_t* data = new proc_data_t();
+
         this->m_is_stopping = true;
-        PRINT_SPRAYMON("[SPRAYMON] Starting final analysis\n");
+        PRINT_DEBUG("[SPRAYMON] Starting final analysis\n");
         drakvuf_enumerate_processes(drakvuf, process_visitor, static_cast<void*>(process_list));
         for (const auto& process : *process_list)
         {
             gdi_max_count = 0;
             usr_max_count = 0;
 
-            proc_data_t data = {};
-            if (!drakvuf_get_process_data(drakvuf, process, &data))
+            if (!drakvuf_get_process_data(drakvuf, process, data))
             {
-                PRINT_SPRAYMON("[SPRAYMON] Failed to get process data.\n");
+                PRINT_DEBUG("[SPRAYMON] Failed to get process data.\n");
+                if (data->name) g_free(const_cast<char*>(data->name));
                 continue;
             }
             if (!drakvuf_get_process_pid(drakvuf, process, &pid))
             {
-                PRINT_SPRAYMON("[SPRAYMON] Failed to get process pid.\n");
+                PRINT_DEBUG("[SPRAYMON] Failed to get process pid.\n");
+                if (data->name) g_free(const_cast<char*>(data->name));
                 continue;
             }
-   
-            info.attached_proc_data = data;
-            info.proc_data = data;
 
             if (!check_counters(drakvuf, process, pid, &gdi_max_count, &usr_max_count))
             {
-                PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\n", data.name);
+                PRINT_DEBUG("[SPRAYMON] (fail) Process name -> %s\n", data->name);
+                if (data->name) g_free(const_cast<char*>(data->name));
                 continue;
             }
-            compare(drakvuf, gdi_max_count, usr_max_count);
+            compare(drakvuf, gdi_max_count, usr_max_count, const_cast<char*>(data->name), data->pid);
 
-            PRINT_SPRAYMON("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
-                        data.name, gdi_max_count, usr_max_count);
+            PRINT_DEBUG("[SPRAYMON] Process name -> %s\nGDI count -> %du\nUSER count -> %du\n", 
+                        data->name, gdi_max_count, usr_max_count);
 
-            g_free(const_cast<char*>(data.name));
+            if (data->name) g_free(const_cast<char*>(data->name));
 
         }
+        delete data;
         delete process_list;
     }  
     return true;
