@@ -107,8 +107,6 @@
 
 //#pragma once
 #include "plugins/plugins_ex.h"
-#include <unordered_map>
-
 
 struct spraymon_config
 {
@@ -124,10 +122,10 @@ public:
     std::unique_ptr<libhook::SyscallHook> syscall;
 
 
-    addr_t Eprocess_Win32Process;
+    addr_t eprocess_win32process;
     //_W32PROCESS offsets
-    size_t GDIHandleCountPeak;
-    size_t UserHandleCountPeak;
+    size_t gdihandlecountpeak;
+    size_t userhandlecountpeak;
 
     //assigned from config
     uint16_t gdi_threshold;
