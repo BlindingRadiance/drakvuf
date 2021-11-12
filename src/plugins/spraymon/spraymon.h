@@ -121,7 +121,6 @@ public:
     const output_format_t format;
     std::unique_ptr<libhook::SyscallHook> syscall;
 
-
     addr_t eprocess_win32process;
     //_W32PROCESS offsets
     size_t gdihandlecountpeak;
@@ -136,7 +135,7 @@ public:
     ~spraymon();
     bool stop();
 
-    bool check_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t* gdi_max_count,  uint16_t*  usr_max_count);
+    bool get_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t* gdi_max_count,  uint16_t*  usr_max_count);
     void compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count, char* process_name, vmi_pid_t pid);
     bool read_kernel_addr(drakvuf_t drakvuf, addr_t in_address, vmi_pid_t pid, addr_t* out_address);
     bool read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value);

@@ -341,9 +341,6 @@ static void print_usage()
         "\t --json-fltmgr <path to json>\n"
         "\t                           The JSON profile for fltmgr.sys\n"
 #endif
-#ifdef ENABLE_PLUGIN_SPRAYMON
-        "\t                           Monitor handle count for possible heap spray detection. This requires the presence of a win32k-profile, which has to be specified via -W\n"
-#endif
         "\t -h, --help                Show this help\n"
     );
 }
