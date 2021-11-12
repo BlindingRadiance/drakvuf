@@ -306,7 +306,6 @@ endif
 if PLUGIN_SPRAYMON
 sources += spraymon/spraymon.cpp
 sources += spraymon/spraymon.h
-sources += spraymon/private.h
 endif
 
 if PLUGIN_IPT
