@@ -164,7 +164,7 @@ void spraymon::compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_m
         fmt::print(this->format, "spraymon", drakvuf, nullptr,
             keyval("PID", fmt::Nval(pid)),
             keyval("ProcessName", fmt::Qstr(process_name)),
-            keyval("Reason", fmt::Qstr("High graphic objects count detected!")));
+            keyval("Reason", fmt::Qstr("High graphic objects count")));
     }
 }
 
@@ -211,9 +211,35 @@ event_response_t spraymon::hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_tr
     return VMI_EVENT_RESPONSE_NONE;
 }
 
-spraymon::spraymon(drakvuf_t drakvuf,  const spraymon_config* config, output_format_t output)
-    : pluginex(drakvuf, output), format(output), gdi_threshold(config->gdi_threshold), usr_threshold(config->usr_threshold)
+spraymon::spraymon(drakvuf_t drakvuf, const spraymon_config* config,
+    output_format_t output)
+    : pluginex(drakvuf, output)
+    , format(output)
+    , do_final_analysis(true)
+    , gdi_threshold(config->gdi_threshold)
+    , usr_threshold(config->usr_threshold)
+
 {
+    win_ver_t winver;
+    uint16_t build;
+    {
+        vmi_lock_guard vmi(drakvuf);
+        win_build_info_t build_info;
+        if (!vmi_get_windows_build_info(vmi, &build_info))
+            throw -1;
+
+        winver = build_info.version;
+        build = build_info.buildnumber;
+    }
+
+    //https://www.geoffchappell.com/studies/windows/km/win32k/structs/processinfo/index.htm
+    if (winver != VMI_OS_WINDOWS_7 && !(winver == VMI_OS_WINDOWS_10 && build >= 14393))
+    {
+        PRINT_DEBUG("[SPRAYMON] Spraymon plugin supports only Windows 7 and Windows 10 (=>1607)\n");
+        do_final_analysis = false;
+        return;
+    }
+
     if (!config->win32k_profile)
     {
         PRINT_DEBUG("[SPRAYMON] Win32k json profile required to run the plugin.\n");
@@ -252,9 +278,9 @@ spraymon::~spraymon()
 
 }
 
-bool spraymon::stop()
+bool spraymon::stop_impl()
 {
-    if (!this->is_stopping())
+    if (!this->is_stopping() && do_final_analysis)
     {
         std::vector<addr_t> process_list;
         vmi_pid_t pid;
@@ -262,7 +288,6 @@ bool spraymon::stop()
         uint16_t usr_max_count;
         proc_data_t data{};
 
-        this->m_is_stopping = true;
         PRINT_DEBUG("[SPRAYMON] Starting final analysis\n");
         drakvuf_enumerate_processes(drakvuf, process_visitor, &process_list);
         for (const auto& process : process_list)

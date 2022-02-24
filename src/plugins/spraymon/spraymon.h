@@ -88,7 +88,7 @@
  * otherwise) that you are offering unlimited, non-exclusive right to      *
  * reuse, modify, and relicense the code.  DRAKVUF will always be          *
  * available Open Source, but this is important because the inability to   *
-* relicense code has caused devastating problems for other Free Software  *
+ * relicense code has caused devastating problems for other Free Software  *
  * projects (such as KDE and NASM).                                        *
  * To specify special license conditions of your contributions, just say   *
  * so when you send them.                                                  *
@@ -120,28 +120,27 @@ class spraymon : public pluginex
 public:
     const output_format_t format;
     std::unique_ptr<libhook::SyscallHook> syscall;
+    bool do_final_analysis;
 
     addr_t eprocess_win32process;
     //_W32PROCESS offsets
     size_t gdihandlecountpeak;
     size_t userhandlecountpeak;
 
-    //assigned from config
+    // assigned from config
     uint16_t gdi_threshold;
     uint16_t usr_threshold;
 
-
     spraymon(drakvuf_t drakvuf, const spraymon_config* config, output_format_t output);
     ~spraymon();
-    bool stop();
+    bool stop_impl() override;
 
-    bool get_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t* gdi_max_count,  uint16_t*  usr_max_count);
+    bool get_counters(drakvuf_t drakvuf, addr_t process, vmi_pid_t pid, uint16_t* gdi_max_count, uint16_t* usr_max_count);
     void compare(drakvuf_t drakvuf, uint16_t gdi_max_count, uint16_t usr_max_count, char* process_name, vmi_pid_t pid);
     bool read_kernel_addr(drakvuf_t drakvuf, addr_t in_address, vmi_pid_t pid, addr_t* out_address);
     bool read_counter(drakvuf_t drakvuf, addr_t vaddr, vmi_pid_t pid, uint16_t* value);
 
     event_response_t hook_setwin32process_cb(drakvuf_t drakvuf, drakvuf_trap_info_t* info);
-
 };
 
 #endif // SPRAYMON_H
